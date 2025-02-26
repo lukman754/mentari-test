@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UNPAM Course Viewer</title>
+    <!-- Material UI Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/material-design-icons/3.0.1/iconfont/material-icons.min.css">
+    <!-- Material UI CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <style>
+        body {
+            background-color: #f5f5f5;
+            color: rgba(0,0,0,0.87);
+            font-family: 'Roboto', sans-serif;
+        }
+        .brand-logo {
+            margin-left: 15px;
+        }
+        .card-title {
+            font-weight: 500 !important;
+        }
+        .token-card {
+            overflow: hidden;
+        }
+        .token-input {
+            font-family: monospace;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .user-chip {
+            margin-right: 10px;
+        }
+        .course-card {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .course-card .card-content {
+            flex-grow: 1;
+        }
+        .course-code {
+            font-family: monospace;
+            font-size: 12px;
+            color: #757575;
+        }
+        .course-stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .course-stat {
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            background-color: #e0f2f1;
+            color: #00796b;
+        }
+        .preloader-wrapper {
+            margin: 0 auto;
+            display: block;
+        }
+        .toast-error {
+            background-color: #e53935;
+        }
+        .toast-success {
+            background-color: #43a047;
+        }
+        #tokenStatus {
+            font-size: 12px;
+            font-style: italic;
+            margin-top: 5px;
+        }
+        .verified-icon {
+            color: #43a047;
+            vertical-align: middle;
+            font-size: 16px;
+        }
+        .error-icon {
+            color: #e53935;
+            vertical-align: middle;
+            font-size: 16px;
+        }
+        .helper-text {
+            font-size: 12px;
+            color: #757575;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="blue darken-1">
+        <div class="nav-wrapper">
+            <a href="#" class="brand-logo">UNPAM Course Viewer</a>
+            <ul id="nav-mobile" class="right hide-on-med-and-down">
+                <li><a href="#" id="refreshBtn"><i class="material-icons left">refresh</i>Refresh</a></li>
+                <li><a href="#" id="clearBtn"><i class="material-icons left">delete</i>Clear Data</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Token Input Section -->
+        <div class="row" style="margin-top: 20px;">
+            <div class="col s12">
+                <div class="card token-card">
+                    <div class="card-content">
+                        <span class="card-title">Authentication Token</span>
+                        <div class="input-field">
+                            <textarea id="tokenInput" class="materialize-textarea token-input"></textarea>
+                            <label for="tokenInput">Paste your token here</label>
+                        </div>
+                        <div id="tokenStatus"></div>
+                        <div class="helper-text">Token dapat diambil dari console browser di mentari.unpam.ac.id dengan memanggil fungsi window.getAuthToken()</div>
+                    </div>
+                    <div class="card-action">
+                        <a href="#" id="verifyTokenBtn" class="waves-effect waves-light btn blue">
+                            <i class="material-icons left">verified_user</i>Verify Token
+                        </a>
+                        <a href="#" id="loadCoursesBtn" class="waves-effect waves-light btn blue">
+                            <i class="material-icons left">menu_book</i>Load Courses
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Info Section -->
+        <div class="row" id="userInfoSection" style="display: none;">
+            <div class="col s12">
+                <div class="card">
+                    <div class="card-content">
+                        <span class="card-title">User Information</span>
+                        <div class="row">
+                            <div class="col s12">
+                                <div id="userInfoContent">
+                                    <!-- User info will be inserted here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loadingSection" style="display: none;">
+            <div class="row center-align" style="margin: 40px 0;">
+                <div class="preloader-wrapper big active">
+                    <div class="spinner-layer spinner-blue-only">
+                        <div class="circle-clipper left">
+                            <div class="circle"></div>
+                        </div>
+                        <div class="gap-patch">
+                            <div class="circle"></div>
+                        </div>
+                        <div class="circle-clipper right">
+                            <div class="circle"></div>
+                        </div>
+                    </div>
+                </div>
+                <p>Loading courses data...</p>
+            </div>
+        </div>
+
+        <!-- Courses Grid Section -->
+        <div class="row" id="coursesSection" style="display: none;">
+            <div class="col s12">
+                <div class="card">
+                    <div class="card-content">
+                        <span class="card-title">Your Courses</span>
+                        <div id="coursesStatsRow" class="row" style="margin-bottom: 20px;">
+                            <!-- Course stats will be inserted here -->
+                        </div>
+                        <div class="row" id="coursesGrid">
+                            <!-- Course cards will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Course Detail Modal -->
+    <div id="courseDetailModal" class="modal modal-fixed-footer">
+        <div class="modal-content">
+            <h4 id="modalCourseTitle">Course Details</h4>
+            <div id="modalCourseContent">
+                <!-- Course details will be inserted here -->
+            </div>
+        </div>
+        <div class="modal-footer">
+            <a href="#!" class="modal-close waves-effect waves-light btn-flat">Close</a>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize Materialize components
+            M.AutoInit();
+            
+            // Variables
+            let authToken = localStorage.getItem('unpamToken') || '';
+            let userData = JSON.parse(localStorage.getItem('unpamUserData') || 'null');
+            let coursesData = JSON.parse(localStorage.getItem('unpamCoursesData') || 'null');
+            
+            // DOM Elements
+            const tokenInput = document.getElementById('tokenInput');
+            const tokenStatus = document.getElementById('tokenStatus');
+            const verifyTokenBtn = document.getElementById('verifyTokenBtn');
+            const loadCoursesBtn = document.getElementById('loadCoursesBtn');
+            const userInfoSection = document.getElementById('userInfoSection');
+            const userInfoContent = document.getElementById('userInfoContent');
+            const loadingSection = document.getElementById('loadingSection');
+            const coursesSection = document.getElementById('coursesSection');
+            const coursesGrid = document.getElementById('coursesGrid');
+            const coursesStatsRow = document.getElementById('coursesStatsRow');
+            const refreshBtn = document.getElementById('refreshBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const courseDetailModal = document.getElementById('courseDetailModal');
+            const modalCourseTitle = document.getElementById('modalCourseTitle');
+            const modalCourseContent = document.getElementById('modalCourseContent');
+            
+            // Load saved token if exists
+            if (authToken) {
+                tokenInput.value = authToken;
+                M.updateTextFields();
+                verifyTokenValidity(authToken);
+            }
+            
+            // Load saved data if exists
+            if (userData) {
+                renderUserInfo(userData);
+            }
+            
+            if (coursesData) {
+                renderCourses(coursesData);
+            }
+            
+            // Event Listeners
+            verifyTokenBtn.addEventListener('click', function() {
+                const token = tokenInput.value.trim();
+                if (!token) {
+                    M.toast({html: 'Please enter a token', classes: 'toast-error'});
+                    return;
+                }
+                
+                verifyTokenValidity(token);
+            });
+            
+            loadCoursesBtn.addEventListener('click', function() {
+                if (!authToken) {
+                    M.toast({html: 'Please verify your token first', classes: 'toast-error'});
+                    return;
+                }
+                
+                loadCourses();
+            });
+            
+            refreshBtn.addEventListener('click', function() {
+                if (!authToken) {
+                    M.toast({html: 'Please verify your token first', classes: 'toast-error'});
+                    return;
+                }
+                
+                loadCourses();
+            });
+            
+            clearBtn.addEventListener('click', function() {
+                if (confirm('Are you sure you want to clear all data?')) {
+                    clearAllData();
+                }
+            });
+            
+            // Functions
+            function verifyTokenValidity(token) {
+                try {
+                    const tokenInfo = decodeToken(token);
+                    if (!tokenInfo) {
+                        updateTokenStatus(false, 'Invalid token format');
+                        return;
+                    }
+                    
+                    // Check if token is expired
+                    if (tokenInfo.payload.exp && new Date(tokenInfo.payload.exp * 1000) < new Date()) {
+                        updateTokenStatus(false, 'Token has expired');
+                        return;
+                    }
+                    
+                    // Valid token
+                    authToken = token;
+                    localStorage.setItem('unpamToken', token);
+                    updateTokenStatus(true, 'Token is valid');
+                    
+                    // Save user data
+                    userData = tokenInfo;
+                    localStorage.setItem('unpamUserData', JSON.stringify(userData));
+                    
+                    // Render user info
+                    renderUserInfo(tokenInfo);
+                    
+                    // Enable load courses button
+                    loadCoursesBtn.classList.remove('disabled');
+                    
+                } catch (error) {
+                    console.error('Error verifying token:', error);
+                    updateTokenStatus(false, 'Error verifying token');
+                }
+            }
+            
+            function updateTokenStatus(isValid, message) {
+                tokenStatus.innerHTML = isValid 
+                    ? `<i class="material-icons verified-icon">check_circle</i> ${message}` 
+                    : `<i class="material-icons error-icon">error</i> ${message}`;
+            }
+            
+            function decodeToken(token) {
+                try {
+                    if (!token) return null;
+                    if (token.startsWith("Bearer ")) token = token.substring(7);
+                    if (!token.match(/^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/))
+                        return null;
+
+                    const base64Url = token.split(".")[1];
+                    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+                    const payload = JSON.parse(atob(base64));
+
+                    return {
+                        token,
+                        payload,
+                        userId: payload.id || payload.username || payload.sub || "unknown",
+                        username: payload.username || payload.name || payload.sub || "unknown",
+                        fullname: payload.fullname || payload.name || payload.username || "unknown",
+                        role: payload.role || payload.roles || "unknown",
+                        expires: payload.exp ? new Date(payload.exp * 1000).toLocaleString() : "unknown",
+                    };
+                } catch (e) {
+                    console.error(`Error decoding token: ${e.message}`);
+                    return null;
+                }
+            }
+            
+            function renderUserInfo(tokenInfo) {
+                userInfoContent.innerHTML = `
+                    <div class="chip user-chip">
+                        <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(tokenInfo.fullname)}&background=random" alt="User">
+                        ${tokenInfo.fullname}
+                    </div>
+                    <div class="chip user-chip">
+                        <i class="material-icons left">person</i>
+                        ${tokenInfo.username}
+                    </div>
+                    <div class="chip user-chip">
+                        <i class="material-icons left">badge</i>
+                        ${tokenInfo.role}
+                    </div>
+                    <div class="chip user-chip">
+                        <i class="material-icons left">schedule</i>
+                        Expires: ${tokenInfo.expires}
+                    </div>
+                `;
+                
+                userInfoSection.style.display = 'block';
+            }
+            
+            function loadCourses() {
+                loadingSection.style.display = 'block';
+                coursesSection.style.display = 'none';
+                
+                fetchCoursesList()
+                    .then(data => {
+                        coursesData = data;
+                        localStorage.setItem('unpamCoursesData', JSON.stringify(data));
+                        renderCourses(data);
+                    })
+                    .catch(error => {
+                        console.error('Error loading courses:', error);
+                        M.toast({html: 'Error loading courses: ' + error.message, classes: 'toast-error'});
+                    })
+                    .finally(() => {
+                        loadingSection.style.display = 'none';
+                    });
+            }
+            
+            async function fetchCoursesList() {
+                try {
+                    const apiUrl = `https://mentari.unpam.ac.id/api/user-course?page=1&limit=100`;
+                    
+                    const response = await fetch(apiUrl, {
+                        method: "GET",
+                        headers: {
+                            Authorization: `Bearer ${authToken}`,
+                            "Content-Type": "application/json",
+                        },
+                        cache: "no-store",
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`API responded with status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Fetch detailed data for each course
+                    const coursesWithDetails = await Promise.all(
+                        data.data.map(async course => {
+                            try {
+                                const detailData = await fetchCourseDetail(course.kode_course);
+                                return {
+                                    ...course,
+                                    detail: detailData
+                                };
+                            } catch (error) {
+                                console.error(`Error fetching detail for ${course.kode_course}:`, error);
+                                return {
+                                    ...course,
+                                    detail: null
+                                };
+                            }
+                        })
+                    );
+                    
+                    return {
+                        meta: data.meta,
+                        data: coursesWithDetails
+                    };
+                } catch (error) {
+                    console.error('Error in fetchCoursesList:', error);
+                    throw error;
+                }
+            }
+            
+            async function fetchCourseDetail(courseCode) {
+                try {
+                    const apiUrl = `https://mentari.unpam.ac.id/api/user-course/${courseCode}`;
+                    
+                    const response = await fetch(apiUrl, {
+                        method: "GET",
+                        headers: {
+                            Authorization: `Bearer ${authToken}`,
+                            "Content-Type": "application/json",
+                        },
+                        cache: "no-store",
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`API responded with status: ${response.status}`);
+                    }
+                    
+                    return await response.json();
+                } catch (error) {
+                    console.error(`Error fetching course detail for ${courseCode}:`, error);
+                    throw error;
+                }
+            }
+            
+            function renderCourses(data) {
+                if (!data || !data.data || !Array.isArray(data.data) || data.data.length === 0) {
+                    coursesGrid.innerHTML = '<div class="col s12 center-align">No courses found</div>';
+                    coursesSection.style.display = 'block';
+                    return;
+                }
+                
+                // Render stats
+                coursesStatsRow.innerHTML = `
+                    <div class="col s12 m4">
+                        <div class="card-panel center-align">
+                            <i class="material-icons medium blue-text">menu_book</i>
+                            <h5>${data.data.length}</h5>
+                            <p>Total Courses</p>
+                        </div>
+                    </div>
+                    <div class="col s12 m4">
+                        <div class="card-panel center-align">
+                            <i class="material-icons medium blue-text">today</i>
+                            <h5>${new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</h5>
+                            <p>Last Updated</p>
+                        </div>
+                    </div>
+                    <div class="col s12 m4">
+                        <div class="card-panel center-align">
+                            <i class="material-icons medium blue-text">person</i>
+                            <h5>${userData ? userData.fullname : 'Unknown'}</h5>
+                            <p>User</p>
+                        </div>
+                    </div>
+                `;
+                
+                // Render courses
+                coursesGrid.innerHTML = '';
+                
+                data.data.forEach(course => {
+                    const customUrl = `https://mentari.unpam.ac.id/u-courses/${course.kode_course}`;
+                    
+                    const completionPercentage = course.detail && course.detail.progress 
+                        ? Math.round(course.detail.progress * 100) 
+                        : 0;
+                    
+                    const cardHtml = `
+                        <div class="col s12 m6 l4">
+                            <div class="card course-card hoverable">
+                                <div class="card-content">
+                                    <span class="card-title truncate">${course.coursename}</span>
+                                    <p class="course-code">${course.kode_course}</p>
+                                    <div class="progress" style="margin-top: 15px;">
+                                        <div class="determinate" style="width: ${completionPercentage}%"></div>
+                                    </div>
+                                    <p style="margin-top: 5px; text-align: right; font-size: 12px;">${completionPercentage}% completed</p>
+                                    <div class="course-stats">
+                                        ${course.detail && course.detail.dosen ? 
+                                            `<div class="course-stat">
+                                                <i class="material-icons tiny">person</i> ${course.detail.dosen}
+                                            </div>` : ''}
+                                        <div class="course-stat">
+                                            <i class="material-icons tiny">event</i> ${course.semester || 'N/A'}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-action">
+                                    <a href="${customUrl}" target="_blank" class="blue-text text-darken-2">
+                                        <i class="material-icons left tiny">open_in_new</i>Open
+                                    </a>
+                                    <a href="#" class="blue-text text-darken-2 view-detail-btn" data-course-code="${course.kode_course}">
+                                        <i class="material-icons left tiny">info</i>Details
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    coursesGrid.innerHTML += cardHtml;
+                });
+                
+                // Add event listeners to view detail buttons
+                document.querySelectorAll('.view-detail-btn').forEach(btn => {
+                    btn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        const courseCode = this.getAttribute('data-course-code');
+                        showCourseDetail(courseCode);
+                    });
+                });
+                
+                coursesSection.style.display = 'block';
+            }
+            
+            function showCourseDetail(courseCode) {
+                // Find course data
+                const course = coursesData.data.find(c => c.kode_course === courseCode);
+                if (!course) {
+                    M.toast({html: 'Course not found', classes: 'toast-error'});
+                    return;
+                }
+                
+                modalCourseTitle.textContent = course.coursename;
+                
+                // Generate course detail content
+                let detailHTML = `
+                    <div class="row">
+                        <div class="col s12">
+                            <ul class="collection">
+                                <li class="collection-item">Course Code: <span class="blue-text">${course.kode_course}</span></li>
+                                <li class="collection-item">Semester: <span class="blue-text">${course.semester || 'N/A'}</span></li>
+                                ${course.detail && course.detail.dosen ? 
+                                    `<li class="collection-item">Instructor: <span class="blue-text">${course.detail.dosen}</span></li>` : ''}
+                                ${course.detail && course.detail.nip_dosen ? 
+                                    `<li class="collection-item">Instructor ID: <span class="blue-text">${course.detail.nip_dosen}</span></li>` : ''}
+                                ${course.detail && course.detail.jadwal ? 
+                                    `<li class="collection-item">Schedule: <span class="blue-text">${course.detail.jadwal}</span></li>` : ''}
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col s12">
+                            <h5>Progress</h5>
+                            <div class="progress">
+                                <div class="determinate" style="width: ${course.detail && course.detail.progress ? Math.round(course.detail.progress * 100) : 0}%"></div>
+                            </div>
+                            <p>Completion: ${course.detail && course.detail.progress ? Math.round(course.detail.progress * 100) : 0}%</p>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col s12">
+                            <h5>Quick Links</h5>
+                            <div class="collection">
+                                <a href="https://mentari.unpam.ac.id/u-courses/${course.kode_course}" target="_blank" class="collection-item">
+                                    <i class="material-icons left">open_in_new</i>Open Course Page
+                                </a>
+                                <a href="https://mentari.unpam.ac.id/u-courses/${course.kode_course}/assignment" target="_blank" class="collection-item">
+                                    <i class="material-icons left">assignment</i>Assignments
+                                </a>
+                                <a href="https://mentari.unpam.ac.id/u-courses/${course.kode_course}/forum" target="_blank" class="collection-item">
+                                    <i class="material-icons left">forum</i>Forums
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col s12">
+                            <h5>Raw Response Data</h5>
+                            <pre style="background: #f5f5f5; padding: 10px; overflow: auto; max-height: 200px;">${JSON.stringify(course.detail, null, 2)}</pre>
+                        </div>
+                    </div>
+                `;
+                
+                modalCourseContent.innerHTML = detailHTML;
+                
+                // Open modal
+                const modal = M.Modal.getInstance(courseDetailModal);
+                modal.open();
+            }
+            
+            function clearAllData() {
+                localStorage.removeItem('unpamToken');
+                localStorage.removeItem('unpamUserData');
+                localStorage.removeItem('unpamCoursesData');
+                
+                authToken = '';
+                userData = null;
+                coursesData = null;
+                
+                tokenInput.value = '';
+                M.updateTextFields();
+                updateTokenStatus(false, 'Token cleared');
+                
+                userInfoSection.style.display = 'none';
+                coursesSection.style.display = 'none';
+                
+                M.toast({html: 'All data cleared successfully', classes: 'toast-success'});
+            }
+        });
+    </script>
+</body>
+</html>
